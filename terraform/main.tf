@@ -2,6 +2,9 @@ provider "aws" {
   region = var.region
 }
 
+# Get the current AWS account ID
+data "aws_caller_identity" "current" {}
+
 # IAM role for Lambda
 resource "aws_iam_role" "lambda_role" {
   name = "lambda-role"
@@ -30,7 +33,7 @@ resource "aws_lambda_function" "flask_lambda" {
   role          = aws_iam_role.lambda_role.arn
   handler       = "lambda_function.handler"
   runtime       = "python3.9"
-  architecture  = "arm64"  # Switch to Graviton (arm64)
+  architectures = ["arm64"]  # Switch to Graviton
 
   filename      = "${path.module}/../lambda.zip"
   source_code_hash = filebase64sha256("${path.module}/../lambda.zip")

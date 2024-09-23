@@ -2,25 +2,23 @@
 
 # Define variables
 LAMBDA_ZIP="lambda.zip"
+DOCKER_IMAGE="lambda-build"
 PROJECT_DIR=$(pwd)
 
-# Step 1: Install dependencies
-echo "Installing dependencies..."
-pip install -r requirements.txt -t package
+# Step 1: Build the Docker image
+echo "Building Docker image..."
+docker build -t $DOCKER_IMAGE .
 
-# Step 2: Package the Lambda function
-echo "Packaging Lambda function..."
-cd package
-zip -r ../$LAMBDA_ZIP .
-cd ..
+# Step 2: Run the Docker container to package the Lambda function
+echo "Packaging Lambda function into $LAMBDA_ZIP..."
+docker run --rm -v $PROJECT_DIR:/var/task $DOCKER_IMAGE bash -c "
+    zip -r $LAMBDA_ZIP . -x '*.git*' -x 'docker-compose.yml'
+"
 
-# Add application files to the Lambda package
-zip -g $LAMBDA_ZIP app.py lambda_function.py
-
-# Step 3: Apply the Terraform changes
-echo "Running Terraform apply..."
+# Step 3: Apply the Terraform configuration
+echo "Deploying the Lambda function using Terraform..."
 cd terraform
 terraform apply -auto-approve
 
 # Print completion message
-echo "Lambda function deployed and Terraform applied successfully."
+echo "Lambda function deployed successfully."
