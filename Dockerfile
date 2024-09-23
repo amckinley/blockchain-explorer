@@ -1,5 +1,5 @@
-# Use the official AWS Lambda Python 3.9 base image
-FROM amazon/aws-lambda-python:3.9
+# Use the specific version of the AWS Lambda Python 3.9 base image that supports arm64
+FROM amazon/aws-lambda-python:3.9.2024.05.20.23
 
 # Set the working directory
 WORKDIR /var/task
@@ -8,7 +8,7 @@ WORKDIR /var/task
 COPY requirements.txt .
 
 # Install dependencies
-RUN pip install -r requirements.txt -t .
+RUN pip3 install -r requirements.txt -t .
 
 # Copy your application code
 COPY app.py lambda_function.py ./
