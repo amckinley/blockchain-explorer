@@ -97,7 +97,7 @@ resource "aws_api_gateway_integration" "root_integration" {
   http_method            = aws_api_gateway_method.root_method.http_method
   integration_http_method = "POST"
   type                   = "AWS_PROXY"
-  uri                    = "arn:aws:apigateway:${var.region}:lambda:path/2015-03-31/functions/${aws_lambda_function.flask_lambda.arn}/invocations"
+  uri                    = aws_lambda_function.flask_lambda.invoke_arn
 }
 
 # Proxy resource for all other routes

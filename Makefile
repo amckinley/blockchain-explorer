@@ -19,10 +19,13 @@ docker:
 	@echo "Building Docker image..."
 	docker build -t $(DOCKER_IMAGE_NAME) .
 
-# Deploy target: depends on "docker", pushes to ECR and updates the Lambda function
+# Deploy target: depends on "docker", pushes to ECR, and updates the Lambda function
 deploy: docker
 	@echo "Tagging Docker image..."
 	docker tag $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG) $(ECR_REPO_URI):$(DOCKER_IMAGE_TAG)
+
+	@echo "Authenticating Docker to AWS ECR..."
+	aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(ECR_REPO_URI)
 
 	@echo "Pushing Docker image to ECR..."
 	docker push $(ECR_REPO_URI):$(DOCKER_IMAGE_TAG)
