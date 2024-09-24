@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment directories
+venv/
+.venv/
+.env/
+
+# Environment variables file
+.env
+
+# AWS credentials
+.aws/
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+
+# Terraform variables files
+*.tfvars
+
+# Sensitive configuration files
+*.key
+*.pem
+
+# IDE project files
+.idea/
+.vscode/
+
+# Log files
+*.log
+
+# MacOS files
+.DS_Store
+
+# Docker
+*.dockerignore
