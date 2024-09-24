@@ -1,5 +1,5 @@
-from app import app
-from mangum import Mangum
+from app import app  # Import your Flask app
+from serverless_wsgi import handle_request
 
-# Mangum wraps the Flask app for use with AWS Lambda
-handler = Mangum(app)
+def handler(event, context):
+    return handle_request(app, event, context)
