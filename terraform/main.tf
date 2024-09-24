@@ -5,66 +5,33 @@ provider "aws" {
 # Get the current AWS account ID
 data "aws_caller_identity" "current" {}
 
-
 resource "aws_iam_role" "lambda_role" {
   name = "lambda-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [{
-      Action = "sts:AssumeRole",
-      Effect = "Allow",
-      Principal = {
-        Service = "lambda.amazonaws.com"
-      }
-    }]
-  })
-
-  # Attach the necessary permissions for ECR and Lambda execution
-  managed_policy_arns = [
-    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-  ]
-}
-
-# Add a custom policy for ECR access
-resource "aws_iam_policy" "lambda_ecr_policy" {
-  name        = "lambda-ecr-policy"
-  description = "Policy for Lambda to access ECR"
-  policy      = jsonencode({
-    Version: "2012-10-17",
-    Statement: [
+    Statement = [
       {
-        Effect: "Allow",
-        Action: [
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:BatchCheckLayerAvailability"
-        ],
-        Resource: "arn:aws:ecr:${var.region}:${data.aws_caller_identity.current.account_id}:repository/${aws_ecr_repository.flask_lambda_repo.name}"
-      },
-      {
-        Effect: "Allow",
-        Action: "ecr:GetAuthorizationToken",
-        Resource: "*"
+        Action    = "sts:AssumeRole",
+        Effect    = "Allow",
+        Principal = { Service = "lambda.amazonaws.com" }
       }
     ]
   })
-}
 
-# Attach the custom ECR policy to the Lambda IAM role
-resource "aws_iam_role_policy_attachment" "lambda_ecr_policy_attachment" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = aws_iam_policy.lambda_ecr_policy.arn
+  managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  ]
 }
-
 
 # Lambda function
 resource "aws_lambda_function" "flask_lambda" {
   function_name = "flask_lambda_function"
   role          = aws_iam_role.lambda_role.arn
-  package_type  = "Image"  # Specify that this Lambda function uses a container image
-  image_uri     = "867018086253.dkr.ecr.us-west-2.amazonaws.com/flask-lambda-repo:latest"
-  architectures = ["arm64"]  # Switch to Graviton
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.flask_lambda_repo.repository_url}:latest"
+  architectures = ["arm64"]
 
   environment {
     variables = {
@@ -75,7 +42,6 @@ resource "aws_lambda_function" "flask_lambda" {
 
   timeout = 30
 }
-
 
 resource "aws_api_gateway_rest_api" "api" {
   name        = "flask-api"
@@ -122,7 +88,7 @@ resource "aws_api_gateway_integration" "proxy_integration" {
   http_method            = aws_api_gateway_method.proxy_method.http_method
   integration_http_method = "POST"
   type                   = "AWS_PROXY"
-  uri                    = "arn:aws:apigateway:${var.region}:lambda:path/2015-03-31/functions/${aws_lambda_function.flask_lambda.arn}/invocations"
+  uri                    = aws_lambda_function.flask_lambda.invoke_arn
 }
 
 # Deploy API Gateway
@@ -179,6 +145,70 @@ resource "aws_ecr_lifecycle_policy" "flask_lambda_policy" {
 POLICY
 }
 
+
+# Data source to get your Route53 zone
+data "aws_route53_zone" "primary" {
+  name         = "thebadcode.com."
+  private_zone = false
+}
+
+# Request an ACM certificate for your domain
+resource "aws_acm_certificate" "cert" {
+  domain_name       = "thebadcode.com"
+  validation_method = "DNS"
+
+  tags = {
+    Name = "thebadcode.com certificate"
+  }
+}
+
+# Create DNS validation records in Route53
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.cert.domain_validation_options : dvo.domain_name => dvo
+  }
+
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = each.value.resource_record_name
+  type    = each.value.resource_record_type
+  records = [each.value.resource_record_value]
+  ttl     = 300
+}
+
+# Wait for the certificate to be validated
+resource "aws_acm_certificate_validation" "cert_validation" {
+  certificate_arn         = aws_acm_certificate.cert.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
+# Create a custom domain name in API Gateway
+resource "aws_api_gateway_domain_name" "custom_domain" {
+  domain_name = "thebadcode.com"
+
+  regional_certificate_arn = aws_acm_certificate.cert.arn
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+}
+
+# Map the custom domain to your API stage
+resource "aws_api_gateway_base_path_mapping" "api_mapping" {
+  api_id      = aws_api_gateway_rest_api.api.id
+  stage_name  = aws_api_gateway_deployment.deployment.stage_name
+  domain_name = aws_api_gateway_domain_name.custom_domain.domain_name
+}
+
+resource "aws_route53_record" "custom_domain_record" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "thebadcode.com"
+  type    = "A"
+
+  alias {
+    name                   = aws_api_gateway_domain_name.custom_domain.regional_domain_name
+    zone_id                = aws_api_gateway_domain_name.custom_domain.regional_zone_id
+    evaluate_target_health = false
+  }
+}
 
 # Output the API URL
 output "api_url" {

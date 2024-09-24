@@ -2,7 +2,7 @@ import warnings
 import os
 from dotenv import load_dotenv
 from web3 import Web3
-from flask import Flask, jsonify
+from flask import Flask, jsonify, abort
 
 warnings.filterwarnings("ignore")
 load_dotenv()
@@ -17,23 +17,53 @@ app = Flask(__name__)
 def index():
     return jsonify({"message": "Hello from AWS Lambda!"})
 
-@app.route('/address/balance', methods=['GET'])
-def balance():
-    # Fetch Ethereum balance for a hardcoded address
-    balance = web3.eth.get_balance("0xc94770007dda54cF92009BFF0dE90c06F603a09f")
+@app.route('/address/balance/<address>', methods=['GET'])
+def balance(address):
+    if not web3.is_address(address):
+        abort(400, description="Invalid Ethereum address.")
 
-    # Use web3.fromWei to convert from Wei to Ether
+    try:
+        balance = web3.eth.get_balance(address)
+    except Exception as e:
+        abort(500, description=str(e))
     balance_in_ether = web3.from_wei(balance, 'ether')
     return jsonify({"balance": str(balance_in_ether)})
 
-@app.route('/address/balance2', methods=['GET'])
-def balance2():
-    # Fetch Ethereum balance for a hardcoded address
-    balance = web3.eth.get_balance("0xc94770007dda54cF92009BFF0dE90c06F603a09f")
+@app.errorhandler(400)
+def bad_request(error):
+    response = jsonify({
+        "error": "Bad Request",
+        "message": error.description
+    })
+    response.status_code = 400
+    return response
 
-    # Use web3.fromWei to convert from Wei to Ether
-    balance_in_ether = web3.from_wei(balance, 'ether')
-    return jsonify({"balls": str(balance_in_ether)})
+@app.errorhandler(404)
+def not_found(error):
+    response = jsonify({
+        "error": "Not Found",
+        "message": "The requested URL was not found on the server."
+    })
+    response.status_code = 404
+    return response
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    response = jsonify({
+        "error": "Internal Server Error",
+        "message": error.description
+    })
+    response.status_code = 500
+    return response
+
+@app.errorhandler(Exception)
+def unhandled_exception(e):
+    response = jsonify({
+        "error": "Internal Server Error",
+        "message": str(e)
+    })
+    response.status_code = 500
+    return response
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5005, debug=True)

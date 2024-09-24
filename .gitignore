@@ -18,8 +18,10 @@ venv/
 *.tfstate
 *.tfstate.*
 
-# Terraform variables files
+# Terraform variables files and nonsense
 *.tfvars
+terraform/.terraform.lock.hcl
+terraform/.terraform/
 
 # Sensitive configuration files
 *.key
