@@ -26,5 +26,14 @@ def balance():
     balance_in_ether = web3.from_wei(balance, 'ether')
     return jsonify({"balance": str(balance_in_ether)})
 
+@app.route('/address/balance2', methods=['GET'])
+def balance2():
+    # Fetch Ethereum balance for a hardcoded address
+    balance = web3.eth.get_balance("0xc94770007dda54cF92009BFF0dE90c06F603a09f")
+
+    # Use web3.fromWei to convert from Wei to Ether
+    balance_in_ether = web3.from_wei(balance, 'ether')
+    return jsonify({"balls": str(balance_in_ether)})
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5005, debug=True)
