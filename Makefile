@@ -38,6 +38,10 @@ deploy: docker
 
 	@echo "Lambda function deployed successfully."
 
+# Follow prod logs
+tail:
+	aws logs tail /aws/lambda/flask_lambda_function --follow
+
 # Clean target: Removes Docker images (optional)
 clean:
 	@echo "Cleaning up Docker images..."
